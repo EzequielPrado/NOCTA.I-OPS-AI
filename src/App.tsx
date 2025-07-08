@@ -53,61 +53,97 @@ function App() {
     revenue: ''
   });
 
+ const [isFormSubmitted, setIsFormSubmitted] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isFormSubmitted, setIsFormSubmitted] = useState(false);
   const [visibleSteps, setVisibleSteps] = useState<number[]>([]);
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    // Smooth scroll behavior
     document.documentElement.style.scrollBehavior = 'smooth';
-    
-    // Intersection Observer for framework steps animation
+    const setVH = () => {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    };
+    setVH();
+    window.addEventListener('resize', setVH);
+    const timer = setTimeout(() => setIsVisible(true), 500);
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             const stepIndex = parseInt(entry.target.getAttribute('data-step') || '0');
-            setVisibleSteps(prev => [...prev, stepIndex]);
+            setVisibleSteps((prev) => [...prev, stepIndex]);
           }
         });
       },
       { threshold: 0.3 }
     );
-
-    // Observe framework steps
     const steps = document.querySelectorAll('[data-step]');
-    steps.forEach(step => observer.observe(step));
+    steps.forEach((step) => observer.observe(step));
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', setVH);
+      clearTimeout(timer);
+    };
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('Form submitted:', formData);
-    setIsFormSubmitted(true);
-    setTimeout(() => setIsFormSubmitted(false), 5000);
+
+    const WEBHOOK_URL = 'https://manuela.noctai.com.br/webhook/32577b32-30d4-4f63-b080-288973ec4810';
+    const submitButton = e.currentTarget.querySelector('button[type="submit"]') as HTMLButtonElement;
+    const originalText = submitButton.innerHTML;
+    submitButton.innerHTML = '⏳ Enviando...';
+    submitButton.disabled = true;
+
+    try {
+      const response = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          nome: formData.name,
+          whatsapp: formData.whatsapp,
+          email: formData.email,
+          empresa: formData.company,
+          segmento: formData.segment,
+          website: formData.website,
+          faturamento: formData.revenue,
+          timestamp: new Date().toISOString(),
+          origem: 'landing-page-diagnostico'
+        })
+      });
+
+      if (response.ok) {
+        setIsFormSubmitted(true);
+        console.log('Formulário enviado com sucesso!');
+      } else {
+        throw new Error(`Erro HTTP: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Erro ao enviar formulário:', error);
+      alert('❌ Ops! Houve um erro ao enviar o formulário. Tente novamente.');
+    } finally {
+      submitButton.innerHTML = originalText;
+      submitButton.disabled = false;
+    }
   };
 
-  const scrollToForm = () => {
-    document.getElementById('formulario')?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const toggleFAQ = (index: number) => {
-    setOpenFAQ(openFAQ === index ? null : index);
-  };
+  const scrollToForm = () => document.getElementById('formulario')?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+  const toggleFAQ = (index: number) => setOpenFAQ(openFAQ === index ? null : index);
 
   return (
     <div className="min-h-screen bg-[#04020a] text-white relative overflow-hidden" style={{ backgroundColor: '#0b0b0b' }}>
@@ -495,7 +531,7 @@ function App() {
           </p>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 bg-[#1d1d1d] p-6 rounded-xl border border-[#6831f3]/30">
           {/* Nome / WhatsApp */}
           <div className="grid md:grid-cols-2 gap-6">
             <div>
@@ -574,6 +610,7 @@ function App() {
               />
             </div>
           </div>
+        
 
           {/* Faixa de faturamento */}
           <div>
@@ -606,7 +643,6 @@ function App() {
     </div>
   </div>
 </section>
-
       
 {/* Framework Section */}
 <section id="como-funciona" className="py-20 bg-gradient-to-br from-[#140037]/30 to-[#1d1d1d]/50 backdrop-blur-sm px-4">
